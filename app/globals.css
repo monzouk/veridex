@@ -11,9 +11,12 @@ button, input { font: inherit; }
 .site-shell { overflow: hidden; background: var(--ink); }
 .site-header { align-items: center; display: flex; height: 84px; justify-content: space-between; left: 0; padding: 0 clamp(24px, 5vw, 80px); position: absolute; right: 0; top: 0; z-index: 10; }
 .brand { align-items: center; display: inline-flex; gap: 12px; }
-.brand-mark { align-items: center; background: linear-gradient(145deg, #f8cf8a 8%, #c98535 42%, #50755f 71%, #d9903b); background-clip: text; color: transparent; display: inline-flex; font-size: 44px; font-weight: 900; letter-spacing: -12px; line-height: .8; transform: scaleX(.82); transform-origin: left center; width: 28px; }
-.brand-name { font-size: 18px; font-weight: 700; letter-spacing: .26em; }
-.brand-dot { color: var(--gold-bright); font-size: 8px; margin-left: 2px; vertical-align: top; }
+.brand-logo {
+  display: block;
+  height: 42px;
+  width: auto;
+  object-fit: contain;
+}
 .main-nav { align-items: center; display: flex; gap: clamp(20px, 3vw, 44px); margin-left: 8%; }
 .main-nav a, .text-link { align-items: center; color: #babdb9; display: inline-flex; font-size: 11px; gap: 5px; letter-spacing: .11em; text-transform: uppercase; transition: color .25s ease; }
 .main-nav a:hover, .text-link:hover { color: var(--cream); }
@@ -137,8 +140,6 @@ h1 span, em { color: var(--gold-bright); font-style: normal; }
 .email-form button:hover { background: #ffd58d; }
 .success-message { align-items: center; color: #c0e2bf; display: flex; font-size: 13px; gap: 8px; justify-content: center; margin-top: 35px; }
 .site-footer { align-items: center; border-top: 1px solid var(--line); display: grid; gap: 30px; grid-template-columns: 1fr auto 1fr; padding: 30px clamp(24px, 5vw, 70px); }
-.site-footer .brand-name { font-size: 15px; }
-.site-footer .brand-mark { font-size: 36px; }
 .site-footer p, .site-footer small { color: #6d746e; font-size: 10px; letter-spacing: .08em; margin: 0; }
 .footer-links { display: flex; gap: 22px; }
 .footer-links a { color: #8f968f; font-size: 10px; transition: color .2s ease; }
