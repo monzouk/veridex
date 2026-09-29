@@ -84,9 +84,12 @@ export default function Home() {
     <main className="site-shell" ref={revealRef}>
       <header className="site-header">
         <a className="brand" href="#top" aria-label="Veridex home">
-          <span className="brand-mark">V</span>
-          <span className="brand-name">VERIDEX<span className="brand-dot">®</span></span>
-        </a>
+  <img
+    src="/veridex-logo.png"
+    alt="VERIDEX"
+    className="brand-logo"
+  />
+</a>
 
         <nav className={`main-nav ${menuOpen ? 'is-open' : ''}`} aria-label="Primary navigation">
           {navItems.map((item) => (
@@ -164,7 +167,26 @@ export default function Home() {
 
       <section className="contact-section" id="contact"><div className="contact-glow" /><div className="contact-content" data-reveal><p className="eyebrow light"><span className="eyebrow-line" /> Your next control advantage</p><h2>Ready to see<br /><em>what is true?</em></h2><p>Get the Veridex briefing and start building a clearer way forward.</p>{submitted ? <div className="success-message"><Check size={18} /> You are on the list. We will be in touch shortly.</div> : <form className="email-form" onSubmit={handleSubmit}><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Work email address" aria-label="Work email address" required /><button type="submit" aria-label="Submit email"><ArrowRight size={19} /></button></form>}</div></section>
 
-      <footer className="site-footer" data-reveal><a className="brand" href="#top"><span className="brand-mark">V</span><span className="brand-name">VERIDEX<span className="brand-dot">®</span></span></a><p>Truth in every control.</p><div className="footer-links"><a href="#platform">Platform</a><a href="#solutions">Solutions</a><a href="#resources">Resources</a><a href="#contact">Contact</a></div><small>&copy; 2026 Veridex. All rights reserved.</small></footer>
-    </main>
-  );
+     <footer className="site-footer" data-reveal>
+  <a className="brand" href="#top" aria-label="Veridex home">
+    <img
+      src="/veridex-logo.png"
+      alt="VERIDEX"
+      className="brand-logo"
+    />
+  </a>
+
+  <p>Truth in every control.</p>
+
+  <div className="footer-links">
+    <a href="#platform">Platform</a>
+    <a href="#solutions">Solutions</a>
+    <a href="#resources">Resources</a>
+    <a href="#contact">Contact</a>
+  </div>
+
+  <small>&copy; 2026 Veridex. All rights reserved.</small>
+</footer>
+</main>
+);
 }
