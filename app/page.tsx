@@ -17,6 +17,9 @@ import {
   ShieldCheck,
   X,
 } from 'lucide-react';
+import EvidenceCanvas from '@/components/EvidenceCanvas';
+import TruthLens from '@/components/TruthLens';
+import AnimatedLogo from '@/components/AnimatedLogo';
 
 const navItems = [
   { name: 'Platform', href: '#platform' },
@@ -28,19 +31,22 @@ const navItems = [
 const features = [
   {
     icon: ScanSearch,
-    eyebrow: '01 / OBSERVE',
+    num: 1,
+    eyebrowSuffix: ' / OBSERVE',
     title: 'See what others miss.',
     copy: 'Turn scattered signals into a clear, continuously updated view of risk across your organization.',
   },
   {
     icon: FileCheck2,
-    eyebrow: '02 / VERIFY',
+    num: 2,
+    eyebrowSuffix: ' / VERIFY',
     title: 'Make every claim count.',
     copy: 'Validate evidence at the source and replace assumptions with decisions you can stand behind.',
   },
   {
     icon: CircleGauge,
-    eyebrow: '03 / CONTROL',
+    num: 3,
+    eyebrowSuffix: ' / CONTROL',
     title: 'Move with confidence.',
     copy: 'Keep controls measurable, accountable, and ready for the next moment that matters.',
   },
@@ -61,6 +67,66 @@ const faqs = [
   ],
 ];
 
+function AnimatedNumber({
+  value,
+  prefix = '',
+  suffix = '',
+  decimals = 0,
+}: {
+  value: number;
+  prefix?: string;
+  suffix?: string;
+  decimals?: number;
+}) {
+  const [displayValue, setDisplayValue] = useState(0);
+  const [hasStarted, setHasStarted] = useState(false);
+  const ref = useRef<HTMLSpanElement | null>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setDisplayValue(value);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !hasStarted) {
+          setHasStarted(true);
+          const startTime = performance.now();
+          const duration = 1000;
+          const animate = (now: number) => {
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const ease = 1 - Math.pow(1 - progress, 3);
+            setDisplayValue(Number((value * ease).toFixed(decimals)));
+            if (progress < 1) {
+              requestAnimationFrame(animate);
+            } else {
+              setDisplayValue(value);
+            }
+          };
+          requestAnimationFrame(animate);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.2 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [value, decimals, hasStarted]);
+
+  return (
+    <span ref={ref} className="tabular-nums">
+      {prefix}
+      {displayValue.toFixed(decimals)}
+      {suffix}
+    </span>
+  );
+}
+
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState(0);
@@ -68,14 +134,17 @@ export default function Home() {
   const [submitted, setSubmitted] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [utcTime, setUtcTime] = useState('08:42:16 UTC');
-  const [trustIndex, setTrustIndex] = useState(98.4);
+  const [trustIndex, setTrustIndex] = useState(0.0);
+  const [initialCountDone, setInitialCountDone] = useState(false);
   const [cardTilt, setCardTilt] = useState({ x: 0, y: 0 });
+  const [isScrolled, setIsScrolled] = useState(false);
 
   const revealRef = useRef<HTMLElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const menuToggleRef = useRef<HTMLButtonElement | null>(null);
+  const progressBarRef = useRef<HTMLDivElement | null>(null);
 
-  // Hydration-safe live UTC Clock & dynamic trust index tick
+  // Hydration-safe live UTC Clock & initial trust index count-up
   useEffect(() => {
     setMounted(true);
 
@@ -91,6 +160,8 @@ export default function Home() {
 
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReducedMotion) {
+      setTrustIndex(98.4);
+      setInitialCountDone(true);
       return;
     }
 
@@ -99,6 +170,42 @@ export default function Home() {
         updateClock();
       }
     }, 1000);
+
+    // Initial count-up from 0.0 to 98.4 over 1200ms
+    const startCountTimer = setTimeout(() => {
+      const startTime = performance.now();
+      const duration = 1200;
+      const startVal = 0;
+      const targetVal = 98.4;
+
+      const animateCount = (now: number) => {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const ease = 1 - Math.pow(1 - progress, 3);
+        const current = Number((startVal + (targetVal - startVal) * ease).toFixed(1));
+        setTrustIndex(current);
+
+        if (progress < 1) {
+          requestAnimationFrame(animateCount);
+        } else {
+          setTrustIndex(98.4);
+          setInitialCountDone(true);
+        }
+      };
+
+      requestAnimationFrame(animateCount);
+    }, 450);
+
+    return () => {
+      clearInterval(clockInterval);
+      clearTimeout(startCountTimer);
+    };
+  }, []);
+
+  // Fluctuate Trust Index between 98.1 and 98.7 every 3.8s after initial count is done
+  useEffect(() => {
+    if (!initialCountDone) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
     const trustValues = [98.4, 98.6, 98.2, 98.7, 98.3, 98.5];
     let trustIndexCursor = 0;
@@ -110,10 +217,25 @@ export default function Home() {
       }
     }, 3800);
 
-    return () => {
-      clearInterval(clockInterval);
-      clearInterval(trustInterval);
+    return () => clearInterval(trustInterval);
+  }, [initialCountDone]);
+
+  // Window scroll listener for header blur and scroll progress bar fallback
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollY = window.scrollY;
+      setIsScrolled(scrollY > 24);
+
+      if (progressBarRef.current) {
+        const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+        const progress = docHeight > 0 ? Math.min(Math.max(scrollY / docHeight, 0), 1) : 0;
+        progressBarRef.current.style.transform = `scaleX(${progress})`;
+      }
     };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   // Scroll reveal observer
@@ -174,7 +296,6 @@ export default function Home() {
     if (menuOpen) {
       document.body.style.overflow = 'hidden';
       window.addEventListener('keydown', handleKeyDown);
-      // Focus first link in overlay
       setTimeout(() => {
         const firstLink = menuRef.current?.querySelector<HTMLElement>('a');
         firstLink?.focus();
@@ -195,7 +316,6 @@ export default function Home() {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width - 0.5;
     const y = (e.clientY - rect.top) / rect.height - 0.5;
-    // Bounded to max 6 degrees
     setCardTilt({
       x: Number((-y * 12).toFixed(2)),
       y: Number((x * 12).toFixed(2)),
@@ -215,17 +335,13 @@ export default function Home() {
 
   return (
     <main className="site-shell" ref={revealRef}>
+      {/* Scroll Progress Bar at Top of Page */}
+      <div className="scroll-progress-line" ref={progressBarRef} aria-hidden="true" />
+
       {/* Header */}
-      <header className="site-header">
+      <header className={`site-header ${isScrolled ? 'is-scrolled' : ''}`}>
         <a className="brand" href="#top" aria-label="Veridex home">
-          <Image
-            src="/veridex-logo.svg"
-            alt="VERIDEX - Truth in every control"
-            width={185}
-            height={40}
-            priority
-            className="brand-logo"
-          />
+          <AnimatedLogo className="brand-logo" />
         </a>
 
         {/* Desktop Navigation */}
@@ -326,9 +442,22 @@ export default function Home() {
 
       {/* Hero Section */}
       <section className="hero" id="top">
+        {/* Slow drifting amber and green glows */}
+        <div className="hero-glow-amber" aria-hidden="true" />
+        <div className="hero-glow-green" aria-hidden="true" />
+
+        {/* Concentric rotating & pulsing rings */}
         <div className="hero-orb hero-orb-one" aria-hidden="true" />
         <div className="hero-orb hero-orb-two" aria-hidden="true" />
+
+        {/* Subtle grid backdrop */}
         <div className="hero-grid" aria-hidden="true" />
+
+        {/* Faint canvas of drifting evidence nodes and links */}
+        <EvidenceCanvas />
+
+        {/* The Truth Lens (spotlight resolving dim claims to cryptographic proof chips) */}
+        <TruthLens />
 
         <div className="hero-container">
           {/* Left Column on Desktop / Top Column on Mobile */}
@@ -337,7 +466,18 @@ export default function Home() {
               <span className="eyebrow-line" aria-hidden="true" /> Control intelligence, redefined
             </p>
             <h1>
-              Truth in every <span>control.</span>
+              <span className="headline-word-wrap">
+                <span className="headline-word" style={{ animationDelay: '300ms' }}>Truth</span>
+              </span>
+              <span className="headline-word-wrap">
+                <span className="headline-word" style={{ animationDelay: '380ms' }}>in</span>
+              </span>
+              <span className="headline-word-wrap">
+                <span className="headline-word" style={{ animationDelay: '460ms' }}>every</span>
+              </span>
+              <span className="headline-word-wrap">
+                <span className="headline-word headline-word-sweep">control.</span>
+              </span>
             </h1>
             <p className="hero-copy">
               Veridex gives your team the clarity to find what matters, prove what is true, and act before risk becomes reality.
@@ -363,6 +503,9 @@ export default function Home() {
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
           >
+            {/* Soft breathing glow behind the card */}
+            <div className="card-breathing-glow" aria-hidden="true" />
+
             <div
               className="hero-card"
               style={{
@@ -396,8 +539,16 @@ export default function Home() {
                     </radialGradient>
                   </defs>
 
-                  {/* Outer subtle guide ring */}
-                  <circle cx="120" cy="120" r="110" stroke="rgba(42, 46, 52, 0.85)" strokeWidth="1" strokeDasharray="3 4" />
+                  {/* Outer subtle guide ring with slow pulsing */}
+                  <circle
+                    cx="120"
+                    cy="120"
+                    r="110"
+                    stroke="rgba(42, 46, 52, 0.85)"
+                    strokeWidth="1"
+                    strokeDasharray="3 4"
+                    className="ring-pulse"
+                  />
 
                   {/* Mid concentric track */}
                   <circle cx="120" cy="120" r="92" stroke="rgba(168, 164, 150, 0.14)" strokeWidth="2.5" />
@@ -413,7 +564,11 @@ export default function Home() {
                     strokeDasharray="578"
                     strokeDashoffset={578 * (1 - trustIndex / 100)}
                     transform="rotate(-90 120 120)"
-                    style={{ transition: 'stroke-dashoffset 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)' }}
+                    style={{
+                      transition: initialCountDone
+                        ? 'stroke-dashoffset 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)'
+                        : 'none',
+                    }}
                   />
 
                   {/* Inner secondary ring */}
@@ -425,7 +580,10 @@ export default function Home() {
 
                 {/* Core Overlay with Fingerprint and Tabular Index */}
                 <div className="signal-core">
-                  <Fingerprint size={26} aria-hidden="true" />
+                  <div className="fingerprint-scan-container">
+                    <Fingerprint size={26} aria-hidden="true" />
+                    <div className="scanline" aria-hidden="true" />
+                  </div>
                   <span className="tabular-nums">{trustIndex.toFixed(1)}</span>
                   <small>TRUST INDEX</small>
                 </div>
@@ -442,7 +600,9 @@ export default function Home() {
             <div className="float-badge">
               <span className="badge-pulse" aria-hidden="true" />
               <strong>CONTROL HEALTH</strong>
-              <span className="badge-delta tabular-nums">+12.8%</span>
+              <span className="badge-delta">
+                <AnimatedNumber value={12.8} prefix="+" suffix="%" decimals={1} />
+              </span>
             </div>
           </div>
         </div>
@@ -483,12 +643,14 @@ export default function Home() {
           </p>
         </div>
         <div className="feature-grid">
-          {features.map(({ icon: Icon, eyebrow, title, copy }, index) => (
-            <article className="feature-card" key={eyebrow} data-reveal data-delay={index * 120}>
+          {features.map(({ icon: Icon, num, eyebrowSuffix, title, copy }, index) => (
+            <article className="feature-card" key={title} data-reveal data-delay={index * 120}>
               <div className="feature-icon">
                 <Icon size={22} aria-hidden="true" />
               </div>
-              <p className="feature-eyebrow">{eyebrow}</p>
+              <p className="feature-eyebrow">
+                <AnimatedNumber value={num} prefix="0" suffix={eyebrowSuffix} decimals={0} />
+              </p>
               <h3>{title}</h3>
               <p>{copy}</p>
               <a className="circle-link" href="#contact" aria-label={`Learn more about ${title}`}>
@@ -519,13 +681,13 @@ export default function Home() {
           </div>
           <div className="control-map" data-reveal data-delay="200" aria-label="Control map relationship diagram">
             <div className="map-label map-label-top">
-              SIGNAL <span>01</span>
+              SIGNAL <AnimatedNumber value={1} prefix="0" decimals={0} />
             </div>
             <div className="map-label map-label-right">
-              EVIDENCE <span>02</span>
+              EVIDENCE <AnimatedNumber value={2} prefix="0" decimals={0} />
             </div>
             <div className="map-label map-label-bottom">
-              ACTION <span>03</span>
+              ACTION <AnimatedNumber value={3} prefix="0" decimals={0} />
             </div>
             <div className="map-lines" aria-hidden="true">
               <span />
@@ -584,7 +746,9 @@ export default function Home() {
                 onClick={() => setOpenFaq(openFaq === index ? -1 : index)}
                 aria-expanded={openFaq === index}
               >
-                <span>0{index + 1}</span>
+                <span>
+                  <AnimatedNumber value={index + 1} prefix="0" decimals={0} />
+                </span>
                 <strong>{question}</strong>
                 <ChevronDown size={19} aria-hidden="true" />
               </button>

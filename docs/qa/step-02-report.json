@@ -1,0 +1,56 @@
+{
+  "timestamp": "2026-10-01T03:42:47.775Z",
+  "tests": [
+    {
+      "name": "Desktop 1440x900",
+      "desktopChecks": {
+        "hasAnimatedLogo": true,
+        "hasEyebrowLine": true,
+        "headlineWordsCount": 4,
+        "hasSweepWord": true,
+        "hasEvidenceCanvas": true,
+        "hasTruthLens": true,
+        "hasBreathingGlow": true,
+        "hasScanline": true,
+        "hasRingPulse": true,
+        "hasProgressBar": true
+      },
+      "scrollChecks": {
+        "headerIsScrolled": true,
+        "progressBarTransform": "scaleX(0.116482)"
+      },
+      "passed": true
+    },
+    {
+      "name": "Mobile 390x844",
+      "metrics": {
+        "hasHorizontalScroll": false,
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "cardVisible": true,
+        "proofVisible": true,
+        "ringVisible": true
+      },
+      "passed": true
+    },
+    {
+      "name": "Tablet 768x1024",
+      "passed": true
+    },
+    {
+      "name": "prefers-reduced-motion",
+      "checks": {
+        "headlineOpacity": "1",
+        "cardAnimationDuration": "0s"
+      },
+      "passed": true
+    },
+    {
+      "name": "Cumulative Layout Shift",
+      "score": 0,
+      "target": 0.05,
+      "passed": true
+    }
+  ],
+  "passed": true
+}
