@@ -2,13 +2,12 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import AnimatedLogo from '@/components/AnimatedLogo';
+import AddControlButton from '@/components/AddControlButton';
 import {
   ShieldCheck,
   LogOut,
   Building,
   CheckCircle2,
-  AlertCircle,
-  PlusCircle,
   Activity,
   Layers,
   FileCheck2,
@@ -67,14 +66,7 @@ export default async function AppOverviewPage() {
           </div>
 
           <div className="app-quick-actions">
-            <button
-              type="button"
-              className="button button-primary"
-              onClick={() => {}}
-            >
-              <PlusCircle size={16} aria-hidden="true" />
-              <span>Add your first control</span>
-            </button>
+            <AddControlButton />
           </div>
         </div>
 
