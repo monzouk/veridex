@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 52" fill="none">
+  <defs>
+    <linearGradient id="logo-amber" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFC46B" />
+      <stop offset="60%" stop-color="#F29A3D" />
+      <stop offset="100%" stop-color="#D97A1E" />
+    </linearGradient>
+    <linearGradient id="logo-olive" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2A3827" />
+      <stop offset="55%" stop-color="#4F6440" />
+      <stop offset="100%" stop-color="#86AA70" />
+    </linearGradient>
+    <filter id="logo-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.2" result="glow" />
+      <feComposite in="SourceGraphic" in2="glow" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- V Mark Icon (x: 4 to 44, y: 4 to 46) -->
+  <g transform="translate(2, 2)">
+    <path d="M6 8 L18 8 L24 38 L15 38 Z" fill="url(#logo-amber)" filter="url(#logo-glow)" />
+    <path d="M18 8 L24 38 L28 26 Z" fill="#FFE2A8" opacity="0.6" />
+    <path d="M42 8 L30 8 L22 38 L31 38 Z" fill="url(#logo-olive)" />
+    <circle cx="23.5" cy="38" r="1.5" fill="#FFC46B" />
+  </g>
+
+  <!-- Wordmark VERIDEX in Cream (#F6F1E7) -->
+  <text x="56" y="27"
+    fill="#F6F1E7"
+    font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, sans-serif"
+    font-size="21"
+    font-weight="700"
+    letter-spacing="0.18em">VERIDEX</text>
+
+  <!-- Tagline TRUTH IN EVERY CONTROL in Amber (#F29A3D) -->
+  <text x="56.5" y="40"
+    fill="#F29A3D"
+    font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, sans-serif"
+    font-size="6.2"
+    font-weight="600"
+    letter-spacing="0.28em">TRUTH IN EVERY CONTROL</text>
+</svg>
