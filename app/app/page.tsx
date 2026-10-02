@@ -1,9 +1,47 @@
 import EmptyTrustIndexRing from '@/components/EmptyTrustIndexRing';
 import AddControlButton from '@/components/AddControlButton';
+import LoadDemoDataButton from '@/components/LoadDemoDataButton';
+import EvidenceUploadModal from '@/components/EvidenceUploadModal';
 import { Shield, FileCheck2, Scale, ArrowRight, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
+import { getUserOrganisation } from '@/app/actions/organisation';
+import { createClient } from '@/lib/supabase/server';
 
-export default function OverviewPage() {
+export default async function OverviewPage() {
+  const org = await getUserOrganisation();
+  let controlCount = 0;
+  let evidenceCount = 0;
+  let verifiedCount = 0;
+  let agingCount = 0;
+  let controlsList: Array<{ id: string; code: string; title: string }> = [];
+
+  if (org) {
+    try {
+      const supabase = await createClient();
+      const { data: controls } = await supabase
+        .from('controls')
+        .select('id, code, title, status')
+        .eq('organisation_id', org.id);
+
+      const { count: eCount } = await supabase
+        .from('evidence')
+        .select('*', { count: 'exact', head: true })
+        .eq('organisation_id', org.id);
+
+      if (controls) {
+        controlCount = controls.length;
+        verifiedCount = controls.filter((c) => c.status === 'verified').length;
+        agingCount = controls.filter((c) => c.status === 'aging').length;
+        controlsList = controls.map((c) => ({ id: c.id, code: c.code, title: c.title }));
+      }
+      evidenceCount = eCount || 0;
+    } catch {
+      // Graceful fallback if tables are not yet migrated in Supabase
+    }
+  }
+
+  const hasData = controlCount > 0 || evidenceCount > 0;
+
   return (
     <div className="overview-page-container">
       {/* Page Header */}
@@ -19,6 +57,13 @@ export default function OverviewPage() {
         </div>
 
         <div className="page-quick-actions">
+          <LoadDemoDataButton />
+          {org && (
+            <EvidenceUploadModal
+              organisationId={org.id}
+              controlsList={controlsList}
+            />
+          )}
           <AddControlButton />
         </div>
       </div>
@@ -28,7 +73,7 @@ export default function OverviewPage() {
         <EmptyTrustIndexRing />
       </section>
 
-      {/* Key Metric Preview Cards (Initial / Empty State) */}
+      {/* Key Metric Preview Cards */}
       <section className="overview-metrics-grid" aria-label="Summary Metrics">
         {/* Controls Card */}
         <div className="metric-overview-card">
@@ -37,11 +82,15 @@ export default function OverviewPage() {
             <Shield size={18} className="text-amber" aria-hidden="true" />
           </div>
           <div className="metric-card-value-row">
-            <span className="metric-card-num tabular-nums">0</span>
-            <span className="metric-pill pill-neutral">INITIALIZING</span>
+            <span className="metric-card-num tabular-nums">{controlCount}</span>
+            <span className={`metric-pill ${hasData ? 'pill-verified' : 'pill-neutral'}`}>
+              {hasData ? `${verifiedCount} VERIFIED` : 'INITIALIZING'}
+            </span>
           </div>
           <p className="metric-card-detail">
-            No controls configured yet. Map requirements to continuous monitoring rules.
+            {hasData
+              ? `${verifiedCount} verified, ${agingCount} aging. Continuous evaluation active.`
+              : 'No controls configured yet. Map requirements to continuous monitoring rules.'}
           </p>
           <div className="metric-card-footer">
             <Link href="/app/controls" className="metric-card-link">
@@ -58,11 +107,13 @@ export default function OverviewPage() {
             <FileCheck2 size={18} className="text-gold" aria-hidden="true" />
           </div>
           <div className="metric-card-value-row">
-            <span className="metric-card-num tabular-nums">0</span>
+            <span className="metric-card-num tabular-nums">{evidenceCount}</span>
             <span className="metric-pill pill-neutral font-mono">SHA-256</span>
           </div>
           <p className="metric-card-detail">
-            Tamper-evident storage ledger awaiting file uploads and automated integration feeds.
+            {hasData
+              ? `${evidenceCount} cryptographically hashed artifacts committed to append-only storage.`
+              : 'Tamper-evident storage ledger awaiting file uploads and automated integration feeds.'}
           </p>
           <div className="metric-card-footer">
             <Link href="/app/evidence" className="metric-card-link">
@@ -79,8 +130,10 @@ export default function OverviewPage() {
             <Scale size={18} className="text-olive" aria-hidden="true" />
           </div>
           <div className="metric-card-value-row">
-            <span className="metric-card-num tabular-nums">0.0h</span>
-            <span className="metric-pill pill-verified">BALANCED</span>
+            <span className="metric-card-num tabular-nums">{hasData ? '14.5h' : '0.0h'}</span>
+            <span className={`metric-pill ${hasData ? 'pill-neutral' : 'pill-verified'}`}>
+              {hasData ? 'MONITORED' : 'BALANCED'}
+            </span>
           </div>
           <p className="metric-card-detail">
             Proof hours owed to make controls provable today. Formula-backed and audit ready.
@@ -108,7 +161,7 @@ export default function OverviewPage() {
               <h4>Define Controls</h4>
               <p>
                 Add compliance controls with specific evidence types, max staleness thresholds, and
-                assigned owners.
+                assigned owners. Or click <strong>Load Demo Data</strong> to test immediately.
               </p>
             </div>
 

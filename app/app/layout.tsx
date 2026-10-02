@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server';
 import AppSidebar from '@/components/AppSidebar';
 import AppTopBar from '@/components/AppTopBar';
 import AppBottomNav from '@/components/AppBottomNav';
+import OnboardingModal from '@/components/OnboardingModal';
+import { getUserOrganisation } from '@/app/actions/organisation';
 
 export const metadata = {
   title: 'Workspace | VERIDEX',
@@ -23,9 +25,11 @@ export default async function AppLayout({
     redirect('/login?redirectTo=/app');
   }
 
-  // Derive organization name or default
-  const orgName = user.user_metadata?.org_name || 'Veridex Workspace';
-  const userRole = user.user_metadata?.role || 'Owner';
+  // Fetch active organisation from database
+  const org = await getUserOrganisation();
+  const orgName = org?.name || 'Veridex Workspace';
+  const userRole = org?.role || 'Owner';
+  const needsOnboarding = !org;
 
   return (
     <div className="app-shell-root">
@@ -43,6 +47,9 @@ export default async function AppLayout({
       </div>
 
       <AppBottomNav />
+
+      {/* First-Run Onboarding Modal */}
+      {needsOnboarding && <OnboardingModal userEmail={user.email || ''} />}
     </div>
   );
 }
