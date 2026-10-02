@@ -64,7 +64,11 @@ export async function updateSession(request: NextRequest) {
     const targetUrl = request.nextUrl.clone();
     targetUrl.pathname = safePath;
     targetUrl.search = '';
-    return NextResponse.redirect(targetUrl);
+    const redirectResponse = NextResponse.redirect(targetUrl);
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value, cookie);
+    });
+    return redirectResponse;
   }
 
   return supabaseResponse;
