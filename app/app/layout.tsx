@@ -1,0 +1,55 @@
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+import AppSidebar from '@/components/AppSidebar';
+import AppTopBar from '@/components/AppTopBar';
+import AppBottomNav from '@/components/AppBottomNav';
+import OnboardingModal from '@/components/OnboardingModal';
+import { getUserOrganisation } from '@/app/actions/organisation';
+
+export const metadata = {
+  title: 'Workspace | VERIDEX',
+  description: 'Continuous compliance intelligence workspace.',
+};
+
+export default async function AppLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect('/login?redirectTo=/app');
+  }
+
+  // Fetch active organisation from database
+  const org = await getUserOrganisation();
+  const orgName = org?.name || 'Veridex Workspace';
+  const userRole = org?.role || 'Owner';
+  const needsOnboarding = !org;
+
+  return (
+    <div className="app-shell-root">
+      <AppSidebar orgName={orgName} userEmail={user.email} />
+
+      <div className="app-shell-main-wrapper">
+        <AppTopBar
+          orgName={orgName}
+          userEmail={user.email}
+          userRole={userRole}
+        />
+        <main className="app-shell-content">
+          {children}
+        </main>
+      </div>
+
+      <AppBottomNav />
+
+      {/* First-Run Onboarding Modal */}
+      {needsOnboarding && <OnboardingModal userEmail={user.email || ''} />}
+    </div>
+  );
+}
