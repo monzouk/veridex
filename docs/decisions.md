@@ -25,3 +25,19 @@
   2. **The Truth Lens (`components/TruthLens.tsx`)**: Interactive cursor spotlight powered by CSS `clip-path: circle(...)` and pointer `lerp` easing. Resolves dim compliance claims ("Access reviews completed", "Backups tested quarterly", "Encryption keys rotated") into cryptographically-grounded proof chips (source system, timestamp, hash). On touch devices, automatically executes a gentle figure-8 drift. Hidden under 768px to ensure mobile headline readability.
   3. **Animated Logo Mark (`components/AnimatedLogo.tsx`)**: Dynamic stroke dash-offset draw-in sequence on the V ribbon with SVG glow filter and amber-to-olive gradients, transitioning into the crisp Cream wordmark.
   4. **Performance & Reduced-Motion Isolation**: Zero layout shift (CLS = 0.0000). Production Lighthouse scores: 98/100 Mobile Performance, 100/100 Mobile Accessibility. All animations collapse into static final states with zero movement or flash under `prefers-reduced-motion: reduce`.
+
+## Decision 005: Supabase Auth Architecture, Security Controls, and Split-Screen Portal (Step 03)
+- **Context**: Step 03 requires secure authentication matching the Veridex A2 brand aesthetic with email + password, OAuth button placeholders ("Coming soon"), Company SSO link ("Business plan"), password strength validation, route protection for `/app`, and strict security guarantees (generic auth errors, non-revealing password reset, rate-limiting, relative redirect sanitization, httpOnly cookies).
+- **Decision**:
+  1. **Supabase SSR**: Implemented authentication using `@supabase/ssr` with cookie handling via Next.js `cookies()` (`getAll`/`setAll`) and Next.js Edge Middleware (`middleware.ts`).
+  2. **Security Controls**:
+     - `lib/security/redirect.ts`: Strict sanitization of `redirectTo` parameter to ensure only relative paths starting with `/` (rejecting protocol-relative `//`, backslashes `\`, external domains) are accepted.
+     - `lib/security/rate-limit.ts`: In-memory sliding window rate limiter on auth actions (5 attempts/min for login, 3 attempts/min for password reset).
+     - `lib/validations/auth.ts`: Zod schema validation on both server and client for strict email formatting and password complexity (8+ chars, upper, lower, numbers/symbols).
+     - Generic errors on login failure ("Email or password is incorrect") and non-revealing generic confirmation on forgot-password recovery to prevent user enumeration.
+  3. **Split-Screen UX Architecture (`components/AuthSplitShell.tsx`)**:
+     - Left brand panel (desktop >= 992px) featuring animated V mark, drifting evidence canvas, and three rotating proof statements ("Proof over assertion...", "Real-time control intelligence...", "Know which controls are genuinely working...").
+     - Right form card with responsive container, 16px minimum text to eliminate iOS zoom, 44px minimum tap targets, Gold focus rings (`var(--gold)`), password show/hide SVG toggles, and dynamic strength meter.
+     - Single column layout on mobile (<992px) with a slim top brand strip.
+  4. **Workspace Gate (`/app` and `middleware.ts`)**:
+     - Middleware guards all `/app/*` routes, redirecting unauthenticated requests to `/login?redirectTo=...` and redirecting authenticated sessions away from public auth pages.
