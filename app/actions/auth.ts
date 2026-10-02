@@ -11,6 +11,7 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema,
 } from '@/lib/validations/auth';
+import { getSiteUrl } from '@/lib/supabase/url';
 
 export type AuthActionResult = {
   error?: string;
@@ -68,6 +69,11 @@ export async function signInAction(
   });
 
   if (error) {
+    if (error.message?.toLowerCase().includes('email not confirmed')) {
+      return {
+        error: 'Please verify your email address before signing in. Check your inbox for the confirmation link.',
+      };
+    }
     // Generic security error per spec: "Email or password is incorrect"
     return {
       error: 'Email or password is incorrect',
@@ -117,10 +123,9 @@ export async function signUpAction(
     };
   }
 
-  const host = headerList.get('host') || 'localhost:3000';
-  const protocol = host.includes('localhost') ? 'http' : 'https';
+  const siteUrl = getSiteUrl(headerList);
   const safeRedirect = getSafeRedirectUrl(redirectTo, '/app');
-  const emailRedirectTo = `${protocol}://${host}/auth/callback?redirectTo=${encodeURIComponent(safeRedirect)}`;
+  const emailRedirectTo = `${siteUrl}/auth/callback?redirectTo=${encodeURIComponent(safeRedirect)}`;
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
@@ -184,9 +189,8 @@ export async function forgotPasswordAction(
     };
   }
 
-  const host = headerList.get('host') || 'localhost:3000';
-  const protocol = host.includes('localhost') ? 'http' : 'https';
-  const emailRedirectTo = `${protocol}://${host}/auth/callback?redirectTo=/reset-password`;
+  const siteUrl = getSiteUrl(headerList);
+  const emailRedirectTo = `${siteUrl}/auth/callback?redirectTo=/reset-password`;
 
   const supabase = await createClient();
   // Call reset password (errors are swallowed to avoid user enumeration)
