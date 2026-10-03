@@ -79,7 +79,7 @@ export default async function ControlsPage() {
             icon={Shield}
             eyebrow="CONTINUOUS GOVERNANCE"
             title="No compliance controls configured"
-            description="Controls in VERIDEX are not checkboxes. Each control defines automated rules for evidence freshness, required artifacts, and proof calculations. Register your first control to establish your baseline, or seed fictional records with Load Demo Data."
+            description="Controls in VERIDEX are not checkboxes. Each control defines automated rules for evidence freshness, required artifacts, and proof calculations. Register your first control to establish your baseline, or seed fictional records with Load data."
             features={[
               'Freshness threshold monitoring',
               'Multi-source evidence linking',

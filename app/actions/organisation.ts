@@ -62,8 +62,12 @@ export async function getUserOrganisation() {
 export async function createOrganisationAction(
   name: string
 ): Promise<OrganisationResult> {
-  if (!name || name.trim().length < 2) {
+  const trimmed = (name || '').trim();
+  if (trimmed.length < 2) {
     return { success: false, error: 'Organisation name must be at least 2 characters.' };
+  }
+  if (trimmed.length > 80) {
+    return { success: false, error: 'Organisation name cannot exceed 80 characters.' };
   }
 
   const supabase = await createClient();

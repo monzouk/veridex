@@ -767,7 +767,7 @@ h1 {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 2;
+  z-index: 1;
   overflow: hidden;
 }
 
@@ -1130,24 +1130,26 @@ h1 {
   font-weight: 600;
 }
 
+.card-health-badge,
 .float-badge {
-  position: absolute;
-  bottom: -18px;
-  right: -12px;
-  display: inline-flex;
+  position: relative;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   background: rgba(24, 27, 31, 0.95);
   border: 1px solid var(--line);
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   border-radius: 6px;
-  padding: 10px 14px;
+  padding: 8px 12px;
   font-size: 9px;
   letter-spacing: 0.12em;
   color: var(--stone);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  z-index: 5;
+  margin-top: 14px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .float-badge strong {
@@ -1281,7 +1283,7 @@ h1 {
 }
 
 .feature-card {
-  padding: 36px 32px 30px 0;
+  padding: 36px 32px 76px 0;
   border-right: 1px solid var(--line);
   position: relative;
   min-height: 300px;
@@ -1837,8 +1839,8 @@ h1 {
   }
 }
 
-/* Phones (< 768px): STRICT ONE COLUMN ORDER */
-@media (max-width: 767px) {
+/* Tablet and Mobile (< 1024px): Show hamburger menu toggle, hide desktop horizontal nav */
+@media (max-width: 1023px) {
   .desktop-only {
     display: none !important;
   }
@@ -1846,7 +1848,10 @@ h1 {
   .menu-toggle {
     display: flex;
   }
+}
 
+/* Phones (< 768px): STRICT ONE COLUMN ORDER */
+@media (max-width: 767px) {
   .site-header {
     height: 72px;
     padding-left: clamp(16px, 4vw, 24px);
@@ -1903,22 +1908,38 @@ h1 {
   }
 
   .hero-buttons {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
     margin-bottom: 28px;
     width: 100%;
   }
 
   .hero-buttons .button {
-    width: 100%;
-    padding: 14px 20px;
+    padding: 12px 18px;
   }
 
   .hero-buttons .button-quiet {
     border-bottom: 0;
     text-align: center;
-    padding: 8px;
+    padding: 8px 12px;
+  }
+
+  @media (max-width: 479px) {
+    .hero-buttons {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+    }
+
+    .hero-buttons .button,
+    .hero-buttons .button-primary,
+    .hero-buttons .button-quiet {
+      width: 100%;
+      justify-content: center;
+      text-align: center;
+    }
   }
 
   .hero-proof {
@@ -1945,15 +1966,6 @@ h1 {
     transform: none !important;
     margin: 0;
     padding: 20px 18px;
-  }
-
-  .float-badge {
-    position: relative;
-    bottom: auto;
-    right: auto;
-    margin-top: 14px;
-    align-self: center;
-    width: fit-content;
   }
 
   .scroll-hint {
@@ -1996,7 +2008,8 @@ h1 {
   .feature-card {
     border-right: 0;
     border-bottom: 1px solid var(--line);
-    padding: 28px 0;
+    padding: 28px 0 68px 0;
+    position: relative;
     min-height: auto;
   }
 
@@ -2746,6 +2759,7 @@ h1 {
   text-decoration: none;
   font-weight: 600;
   transition: color 0.2s ease;
+  white-space: nowrap;
 }
 
 .auth-accent-link:hover,
@@ -3419,7 +3433,10 @@ h1 {
 }
 
 .page-quick-actions {
-  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 /* --- Empty State Trust Index Card --- */
@@ -4011,6 +4028,7 @@ h1 {
 
 .skeleton-title {
   width: 320px;
+  max-width: 100%;
   height: 32px;
   margin-bottom: 12px;
 }
@@ -4111,6 +4129,8 @@ h1 {
 @media (max-width: 767px) {
   .app-shell-root {
     flex-direction: column;
+    width: 100%;
+    min-width: 0;
   }
 
   .app-sidebar {
@@ -4121,6 +4141,12 @@ h1 {
     display: flex;
   }
 
+  .app-top-bar {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
   .top-bar-mobile-logo {
     display: block;
   }
@@ -4129,8 +4155,90 @@ h1 {
     display: none;
   }
 
+  .app-shell-main-wrapper {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
   .app-shell-content {
-    padding-bottom: calc(76px + env(safe-area-inset-bottom, 16px));
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding-left: clamp(16px, 4vw, 24px);
+    padding-right: clamp(16px, 4vw, 24px);
+    padding-bottom: calc(88px + env(safe-area-inset-bottom, 24px));
+  }
+
+  .page-header-block {
+    width: 100%;
+    min-width: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  .page-header-text {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .page-quick-actions {
+    width: 100%;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .page-quick-actions .demo-data-btn-wrapper,
+  .page-quick-actions .demo-data-button,
+  .page-quick-actions .upload-trigger-btn,
+  .page-quick-actions .add-control-btn,
+  .page-quick-actions .button,
+  .empty-actions-row .demo-data-btn-wrapper,
+  .empty-actions-row .demo-data-button,
+  .empty-actions-row .add-control-btn,
+  .empty-actions-row .button {
+    width: 100% !important;
+    justify-content: center !important;
+    text-align: center !important;
+    box-sizing: border-box !important;
+  }
+
+  .empty-actions-row {
+    width: 100%;
+    min-width: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .overview-metrics-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .guide-steps-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .overview-metrics-grid > *,
+  .guide-steps-grid > *,
+  .metric-overview-card,
+  .empty-trust-index-card,
+  .guide-card,
+  .guide-step-item,
+  .subpage-container,
+  .overview-page-container {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   .empty-state-card {
@@ -4254,6 +4362,162 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+/* --- Form Field & Input Tokens --- */
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cream);
+  letter-spacing: 0.02em;
+}
+
+.input-field {
+  width: 100%;
+  min-height: 48px;
+  height: 48px;
+  background-color: var(--graphite);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 16px;
+  font-size: 16px;
+  font-family: inherit;
+  color: var(--cream);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+}
+
+.input-field::placeholder {
+  color: var(--stone);
+  opacity: 0.6;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--amber);
+  box-shadow: 0 0 0 3px rgba(242, 154, 61, 0.25), 0 0 0 1px var(--gold);
+}
+
+.input-field:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.form-helper-text {
+  display: block;
+  font-size: 12px;
+  color: var(--stone);
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+.form-error-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--status-stale);
+  font-size: 12px;
+  margin-top: 6px;
+  margin-bottom: 0;
+  line-height: 1.4;
+}
+
+/* --- Confirmation Dialog Styles --- */
+.confirm-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(7, 8, 10, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.15s ease forwards;
+}
+
+.confirm-dialog-card {
+  background: linear-gradient(145deg, rgba(24, 27, 31, 0.98), rgba(14, 16, 19, 0.98));
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7), 0 0 40px rgba(242, 154, 61, 0.08);
+  border-radius: 12px;
+  padding: clamp(20px, 4vw, 28px);
+  max-width: 440px;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: modalScale 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.confirm-dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.confirm-dialog-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background-color: rgba(242, 154, 61, 0.12);
+  border: 1px solid rgba(242, 154, 61, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.confirm-dialog-title {
+  font-family: var(--font-heading);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--cream);
+  margin: 0;
+}
+
+.confirm-dialog-message {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--stone);
+  margin: 0;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.confirm-dialog-actions .button {
+  min-height: 44px;
+  padding: 10px 18px;
+}
+
+@media (max-width: 479px) {
+  .confirm-dialog-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+  .confirm-dialog-actions .button {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 .onboarding-roles-preview {
@@ -4679,6 +4943,42 @@ h1 {
   border-radius: 4px;
   font-size: 11px;
   color: var(--stone);
+}
+
+/* ==========================================================================
+   GLOBAL RESPONSIVE SAFEGUARDS & SHORT LANDSCAPE SCREENS
+   ========================================================================== */
+
+/* Short landscape screens (height <= 430px) */
+@media (max-height: 430px) {
+  .hero {
+    min-height: auto !important;
+    padding-top: max(env(safe-area-inset-top), 64px) !important;
+    padding-bottom: max(env(safe-area-inset-bottom), 32px) !important;
+  }
+  .auth-shell {
+    min-height: auto !important;
+  }
+  .onboarding-card,
+  .confirm-dialog-card,
+  .modal-card {
+    max-height: 85svh !important;
+    max-height: 85dvh !important;
+    overflow-y: auto !important;
+  }
+}
+
+/* Fluid wrap for hashes, codes, and emails */
+.proof-hash,
+.font-mono,
+.org-name-label,
+.user-email,
+.code-pill,
+.hash-pill,
+.hash-display-pill,
+.table-cell-hash {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 
