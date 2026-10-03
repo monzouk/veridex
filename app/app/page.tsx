@@ -161,7 +161,7 @@ export default async function OverviewPage() {
               <h4>Define Controls</h4>
               <p>
                 Add compliance controls with specific evidence types, max staleness thresholds, and
-                assigned owners. Or click <strong>Load Demo Data</strong> to test immediately.
+                assigned owners. Or click <strong>Load data</strong> to test immediately.
               </p>
             </div>
 

@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "qa": "node scripts/test-matrix-qa.js",
+    "qa:layout": "node scripts/layout-qa.js",
     "test:isolation": "node scripts/test-multi-tenant-isolation.mjs"
   },
   "dependencies": {
@@ -23,6 +24,7 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "playwright": "^1.63.0",
     "puppeteer-core": "^25.12.0",
     "typescript": "^5.0.0"
   }

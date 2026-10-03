@@ -595,14 +595,15 @@ export default function Home() {
                   Verified <Check size={14} aria-hidden="true" />
                 </strong>
               </div>
-            </div>
 
-            <div className="float-badge">
-              <span className="badge-pulse" aria-hidden="true" />
-              <strong>CONTROL HEALTH</strong>
-              <span className="badge-delta">
-                <AnimatedNumber value={12.8} prefix="+" suffix="%" decimals={1} />
-              </span>
+              {/* Anchored inside the card's padding box */}
+              <div className="card-health-badge float-badge" data-decorative="true" aria-hidden="true">
+                <span className="badge-pulse" aria-hidden="true" />
+                <strong>CONTROL HEALTH</strong>
+                <span className="badge-delta">
+                  <AnimatedNumber value={12.8} prefix="+" suffix="%" decimals={1} />
+                </span>
+              </div>
             </div>
           </div>
         </div>

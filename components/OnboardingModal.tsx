@@ -1,22 +1,28 @@
 'use client';
 
 import { useState } from 'react';
-import { Building2, ShieldCheck, Loader2, ArrowRight } from 'lucide-react';
+import { Building2, ShieldCheck, Loader2, ArrowRight, AlertCircle } from 'lucide-react';
 import { createOrganisationAction } from '@/app/actions/organisation';
 
 interface OnboardingModalProps {
   userEmail: string;
 }
 
-export default function OnboardingModal({ userEmail }: OnboardingModalProps) {
+export default function OnboardingModal({ userEmail: _userEmail }: OnboardingModalProps) {
   const [orgName, setOrgName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!orgName.trim()) {
+    const trimmed = orgName.trim();
+    if (!trimmed) {
       setError('Please provide an organisation name.');
+      return;
+    }
+
+    if (trimmed.length > 80) {
+      setError('Organisation name cannot exceed 80 characters.');
       return;
     }
 
@@ -24,7 +30,7 @@ export default function OnboardingModal({ userEmail }: OnboardingModalProps) {
     setError(null);
 
     try {
-      const res = await createOrganisationAction(orgName);
+      const res = await createOrganisationAction(trimmed);
       if (!res.success) {
         setError(res.error || 'Failed to initialize workspace.');
         setLoading(false);
@@ -59,40 +65,53 @@ export default function OnboardingModal({ userEmail }: OnboardingModalProps) {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="onboarding-form">
+        <form onSubmit={handleSubmit} className="onboarding-form" noValidate>
           <div className="form-field">
             <label htmlFor="org-name-input" className="form-label">
               Organisation Name
             </label>
             <input
               id="org-name-input"
+              name="organization"
               type="text"
               className="input-field"
-              placeholder="e.g. Acme Security Ltd"
+              placeholder="e.g. Acme Corporation"
               value={orgName}
-              onChange={(e) => setOrgName(e.target.value)}
+              onChange={(e) => {
+                setOrgName(e.target.value);
+                if (error) setError(null);
+              }}
+              onBlur={() => setOrgName((prev) => prev.trim())}
               disabled={loading}
               required
               autoFocus
+              maxLength={80}
+              autoComplete="organization"
+              aria-describedby="org-helper-text"
             />
+            <span id="org-helper-text" className="form-helper-text">
+              Your company or organization legal name (maximum 80 characters).
+            </span>
+            {error && (
+              <p className="form-error-inline" role="alert">
+                <AlertCircle size={14} className="text-stale" aria-hidden="true" />
+                <span>{error}</span>
+              </p>
+            )}
           </div>
 
           <div className="onboarding-roles-preview">
-            <span className="roles-preview-title">5-Tier Access Matrix Initialized:</span>
+            <span className="roles-preview-title">Access Matrix Roles:</span>
             <div className="roles-tags-row">
-              <span className="role-tag tag-owner">Owner ({userEmail})</span>
+              <span className="role-tag tag-owner">Owner (you)</span>
               <span className="role-tag">Admin</span>
               <span className="role-tag">Control Owner</span>
+              <span className="role-tag">CMS Executive</span>
+              <span className="role-tag">Executive</span>
               <span className="role-tag">Auditor</span>
               <span className="role-tag">Viewer</span>
             </div>
           </div>
-
-          {error && (
-            <div className="form-error-banner" role="alert">
-              <span>{error}</span>
-            </div>
-          )}
 
           <div className="onboarding-actions">
             <button
