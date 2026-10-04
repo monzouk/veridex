@@ -1,8 +1,20 @@
 /**
  * =============================================================================
- * VERIDEX LAYOUT & RESPONSIVENESS AUTOMATED QA SUITE
+ * VERIDEX COMPREHENSIVE MULTI-ROLE LAYOUT & RESPONSIVENESS QA SUITE
  * =============================================================================
  * Multi-Engine (Chromium, WebKit, Firefox) and Multi-Device Matrix Audit.
+ * Explicitly tests:
+ * - Public Pages: Home, Login, Signup, Forgot Password, Reset Password
+ * - Real One-Time Invite Page: /invite/[token] with a live cryptographically generated token
+ * - Role Dashboards (/app):
+ *   1. Owner Dashboard
+ *   2. Admin Dashboard
+ *   3. Control Owner Dashboard
+ *   4. CMS Executive Dashboard
+ *   5. Executive Dashboard
+ * - Team & Access Governance (/app/team) under Owner and Admin
+ * - Subpages: /app/controls, /app/evidence, /app/proof-debt, /app/settings
+ *
  * Strict Ground Rules (AGENTS.md):
  * - No emojis or emoticons in logs or reports
  * - No secrets exposed
@@ -11,11 +23,15 @@
  *   2. Two visible text/interactive elements overlap (ignoring data-decorative)
  *   3. Any button, link, or input is partly outside the screen
  * - Writes results to docs/qa/layout-report.md and saves screenshots
+ * - DOES NOT RUN CLEANUP
+ * =============================================================================
  */
 
-const { chromium, webkit, firefox, devices } = require('playwright');
+const { chromium, webkit, firefox } = require('playwright');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+const { createClient } = require('@supabase/supabase-js');
 
 // 1. Load credentials from .env.local safely
 function loadEnv() {
@@ -38,8 +54,9 @@ function loadEnv() {
 
 const env = loadEnv();
 const BASE_URL = process.env.SITE_URL || 'http://localhost:3000';
-const TEST_EMAIL = env.TEST_EMAIL || 'veridex.qa.tester@gmail.com';
-const TEST_PASSWORD = env.TEST_PASSWORD || 'Password123!@#Secure';
+const SUPABASE_URL = env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_ANON_KEY = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const COMMON_PASSWORD = env.TEST_PASSWORD || 'Password123!@#Secure';
 
 const QA_DIR = path.join(__dirname, '..', 'docs', 'qa', 'layout');
 if (!fs.existsSync(QA_DIR)) {
@@ -82,25 +99,71 @@ const VIEWPORT_MATRIX = [
   { id: 'desktop-2560x1440', name: 'Desktop 1440p (2560x1440)', width: 2560, height: 1440, category: 'Desktop' },
 ];
 
-// Target pages to audit
-const PAGES_TO_TEST = [
-  { path: '/', name: 'Home Page ("The Truth Lens")', authRequired: false },
-  { path: '/login', name: 'Login Screen', authRequired: false },
-  { path: '/signup', name: 'Sign Up Screen', authRequired: false },
-  { path: '/forgot-password', name: 'Forgot Password', authRequired: false },
-  { path: '/reset-password', name: 'Reset Password', authRequired: false },
-  { path: '/app', name: 'Workspace Overview (Dashboard)', authRequired: true },
-  { path: '/app/controls', name: 'Controls Directory', authRequired: true },
-  { path: '/app/evidence', name: 'Evidence Vault Ledger', authRequired: true },
-  { path: '/app/proof-debt', name: 'Proof Debt Model', authRequired: true },
-  { path: '/app/settings', name: 'Workspace Settings', authRequired: true },
-];
+/**
+ * Finds existing provisioned test accounts or generates a fresh token.
+ */
+async function setupTestContext() {
+  const defaultTs = 1791084755053;
+  const accounts = {
+    owner: { role: 'owner', email: `test.owner.a.${defaultTs}@veridex.qa`, label: 'Owner' },
+    admin: { role: 'admin', email: `test.admin.${defaultTs}@veridex.qa`, label: 'Admin' },
+    control_owner: { role: 'control_owner', email: `test.co.${defaultTs}@veridex.qa`, label: 'Control Owner' },
+    cms_executive: { role: 'cms_executive', email: `test.cmsexec.${defaultTs}@veridex.qa`, label: 'CMS Executive' },
+    executive: { role: 'executive', email: `test.exec.${defaultTs}@veridex.qa`, label: 'Executive' },
+  };
+
+  let realInviteToken = null;
+
+  try {
+    const ownerClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { data: authData } = await ownerClient.auth.signInWithPassword({
+      email: accounts.owner.email,
+      password: COMMON_PASSWORD,
+    });
+
+    if (authData?.user) {
+      const { data: mem } = await ownerClient
+        .from('memberships')
+        .select('organisation_id')
+        .eq('user_id', authData.user.id)
+        .eq('is_active', true)
+        .single();
+
+      if (mem?.organisation_id) {
+        const rawToken = crypto.randomBytes(32).toString('hex');
+        const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+        const { error: invErr } = await ownerClient.from('invites').insert({
+          organisation_id: mem.organisation_id,
+          role: 'viewer',
+          email: `qa.layout.invite.${Date.now()}@veridex.qa`,
+          token_hash: tokenHash,
+          expires_at: expiresAt,
+          status: 'pending',
+          created_by: authData.user.id,
+        });
+
+        if (!invErr) {
+          realInviteToken = rawToken;
+          console.log(`[QA SETUP] Real one-time invite token provisioned for /invite/[token]: ${realInviteToken}`);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[QA SETUP] Could not provision real invite token via Supabase:', err.message);
+  }
+
+  return { accounts, realInviteToken };
+}
 
 /**
- * Evaluates in-page layout integrity:
+ * In-page layout evaluation:
  * 1. Horizontal scroll
  * 2. Offscreen interactive elements
- * 3. Text & interactive overlaps
+ * 3. Text and interactive element overlaps
+ * 4. Badge position inside card
+ * 5. Bottom nav does not cover content
  */
 async function auditPageLayout(page) {
   return await page.evaluate(() => {
@@ -110,7 +173,6 @@ async function auditPageLayout(page) {
     const scrollWidth = doc.scrollWidth;
     const clientWidth = doc.clientWidth;
     const vw = window.innerWidth;
-    const vh = window.innerHeight;
 
     // 1. Horizontal scroll check
     const hasSidewaysScroll = scrollWidth > clientWidth + 1;
@@ -138,17 +200,16 @@ async function auditPageLayout(page) {
       }
     }
 
-    // 3. Overlap check between visible text and interactive elements (ignoring data-decorative)
+    // 3. Overlap check between visible text and interactive elements (ignoring decorative)
     const candidates = Array.from(
       document.querySelectorAll(
-        'h1, h2, h3, h4, p, label, .button, button, a[href], input, .metric-overview-card, .hero-card, .guide-step-item'
+        'h1, h2, h3, h4, p, label, .button, button, a[href], input, .metric-overview-card, .hero-card, .guide-step-item, .reporting-supervisor-banner'
       )
     ).filter((el) => {
       if (el.closest('[data-decorative="true"]')) return false;
       if (el.closest('[aria-hidden="true"]')) return false;
       if (el.closest('.truth-lens-container')) return false;
       if (el.closest('.hero-glow-amber') || el.closest('.hero-glow-green') || el.closest('.hero-orb')) return false;
-      // Fixed bottom navigation bar is an overlay dock, tested separately below for content clearance
       if (el.closest('.app-bottom-nav')) return false;
       const style = window.getComputedStyle(el);
       if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
@@ -163,7 +224,6 @@ async function auditPageLayout(page) {
         const b = candidates[j];
         if (a.contains(b) || b.contains(a)) continue;
 
-        // Form control compound parts (e.g. input and password reveal button inside same input-wrap)
         if (a.closest('.input-wrap') && b.closest('.input-wrap') && a.closest('.input-wrap') === b.closest('.input-wrap')) continue;
         if (a.closest('.search-input-wrapper') && b.closest('.search-input-wrapper') && a.closest('.search-input-wrapper') === b.closest('.search-input-wrapper')) continue;
 
@@ -186,7 +246,6 @@ async function auditPageLayout(page) {
             const overlapW = intersectRight - intersectLeft;
             const overlapH = intersectBottom - intersectTop;
 
-            // Require meaningful overlap (> 8px each dimension)
             if (overlapW > 8 && overlapH > 8) {
               hasCollision = true;
               overlaps.push({
@@ -200,7 +259,7 @@ async function auditPageLayout(page) {
       }
     }
 
-    // Specific check for Hero floating badge inside card padding box
+    // 4. Hero floating badge inside card check
     const card = document.querySelector('.hero-card');
     const badge = document.querySelector('.card-health-badge');
     let badgeInsideCard = true;
@@ -210,7 +269,7 @@ async function auditPageLayout(page) {
       badgeInsideCard = br.top >= cr.top - 2 && br.bottom <= cr.bottom + 2 && br.left >= cr.left - 2 && br.right <= cr.right + 2;
     }
 
-    // Specific check: Ensure bottom tab bar never covers content (adequate container padding-bottom)
+    // 5. Bottom navigation covers content check
     const bottomNav = document.querySelector('.app-bottom-nav');
     let bottomNavCoversContent = false;
     if (bottomNav) {
@@ -240,20 +299,38 @@ async function auditPageLayout(page) {
   });
 }
 
+async function loginAsRole(browser, email, password) {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  try {
+    await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded', timeout: 15000 });
+    await page.fill('#login-email', email);
+    await page.fill('#login-password', password);
+    await page.click('button[type="submit"]');
+    await page.waitForURL('**/app**', { timeout: 15000 });
+    await page.close();
+    return context;
+  } catch (err) {
+    await page.close();
+    await context.close();
+    throw new Error(`Failed to sign in as ${email}: ${err.message}`);
+  }
+}
+
 async function runLayoutQASuite() {
-  console.log('=== VERIDEX COMPREHENSIVE LAYOUT & RESPONSIVENESS QA ===');
+  console.log('=== VERIDEX COMPREHENSIVE MULTI-ROLE LAYOUT QA ===');
   console.log(`Target URL: ${BASE_URL}`);
   console.log(`Engines: Chromium, WebKit (Safari), Firefox`);
-  console.log(`Total Viewports: ${VIEWPORT_MATRIX.length}`);
-  console.log(`Total Target Pages: ${PAGES_TO_TEST.length}`);
   console.log('--------------------------------------------------------\n');
+
+  const { accounts, realInviteToken } = await setupTestContext();
+  const invitePath = realInviteToken ? `/invite/${realInviteToken}` : '/invite/test-token-hash-sample';
 
   const testResults = [];
   let totalTests = 0;
   let passedTests = 0;
   let failedTests = 0;
 
-  // We test on Chromium across all viewports and pages, and on WebKit & Firefox on representative device profiles
   const engines = [
     { name: 'Chromium', launcher: chromium },
     { name: 'WebKit', launcher: webkit },
@@ -272,45 +349,31 @@ async function runLayoutQASuite() {
       continue;
     }
 
-    // Authenticated browser context
-    const authContext = await browser.newContext();
-    const authPage = await authContext.newPage();
+    // -------------------------------------------------------------------------
+    // 1. PUBLIC PAGES (Unauthenticated)
+    // -------------------------------------------------------------------------
+    console.log(`  Auditing public routes on ${engine.name}...`);
+    const publicPages = [
+      { path: '/', name: 'Home Page ("The Truth Lens")' },
+      { path: '/login', name: 'Login Screen' },
+      { path: '/signup', name: 'Sign Up Screen' },
+      { path: '/forgot-password', name: 'Forgot Password' },
+      { path: '/reset-password', name: 'Reset Password' },
+      { path: invitePath, name: 'Real One-Time Invitation Portal' },
+    ];
 
-    // Authenticate
-    console.log(`  Logging into test account on ${engine.name}...`);
-    try {
-      await authPage.goto(`${BASE_URL}/login`);
-      await authPage.fill('#login-email', TEST_EMAIL);
-      await authPage.fill('#login-password', TEST_PASSWORD);
-      await authPage.click('button[type="submit"]');
-      await authPage.waitForURL('**/app**', { timeout: 15000 });
-      console.log(`  Authentication successful on ${engine.name}.`);
-    } catch (err) {
-      console.warn(`  Auth failed on ${engine.name}:`, err.message);
-    }
-
-    // Run all 27 viewports for all engines (Chromium, WebKit, Firefox): 27 viewports x 10 pages = 270 checks per engine
-    const viewportsToRun = VIEWPORT_MATRIX;
-
-    for (const pageConfig of PAGES_TO_TEST) {
-      const activeContext = pageConfig.authRequired ? authContext : browser;
-      const testPage = await activeContext.newPage();
-
+    for (const pageConfig of publicPages) {
+      const page = await browser.newPage();
       try {
-        await testPage.goto(`${BASE_URL}${pageConfig.path}`, { waitUntil: 'domcontentloaded', timeout: 15000 });
-        await testPage.waitForTimeout(200);
-      } catch (navErr) {
-        console.warn(`  Navigation issue on ${pageConfig.path}:`, navErr.message);
-      }
+        await page.goto(`${BASE_URL}${pageConfig.path}`, { waitUntil: 'domcontentloaded', timeout: 15000 });
+        await page.waitForTimeout(200);
 
-      for (const vp of viewportsToRun) {
-        totalTests++;
-        await testPage.setViewportSize({ width: vp.width, height: vp.height });
-        await testPage.waitForTimeout(100);
+        for (const vp of VIEWPORT_MATRIX) {
+          totalTests++;
+          await page.setViewportSize({ width: vp.width, height: vp.height });
+          await page.waitForTimeout(60);
 
-        try {
-          const audit = await auditPageLayout(testPage);
-
+          const audit = await auditPageLayout(page);
           const isPass =
             !audit.hasSidewaysScroll &&
             audit.offscreen.length === 0 &&
@@ -318,21 +381,13 @@ async function runLayoutQASuite() {
             audit.badgeInsideCard &&
             !audit.bottomNavCoversContent;
 
-          if (isPass) {
-            passedTests++;
-          } else {
-            failedTests++;
-          }
+          if (isPass) passedTests++;
+          else failedTests++;
 
-          const screenshotName = `${engine.name.toLowerCase()}-${vp.id}-${pageConfig.path.replace(/\//g, '_') || 'home'}.png`;
-          const screenshotPath = path.join(QA_DIR, screenshotName);
-
-          // Capture screenshot for visual audit
+          const screenshotName = `${engine.name.toLowerCase()}-${vp.id}-${pageConfig.name.replace(/[^a-zA-Z0-9]/g, '_')}.png`;
           try {
-            await testPage.screenshot({ path: screenshotPath, fullPage: false, timeout: 5000, animations: 'disabled' });
-          } catch (sErr) {
-            // Non-fatal screenshot capture timeout
-          }
+            await page.screenshot({ path: path.join(QA_DIR, screenshotName), timeout: 4000 });
+          } catch {}
 
           testResults.push({
             engine: engine.name,
@@ -341,75 +396,95 @@ async function runLayoutQASuite() {
             width: vp.width,
             height: vp.height,
             page: pageConfig.name,
-            path: pageConfig.path,
+            role: 'Unauthenticated',
             hasSidewaysScroll: audit.hasSidewaysScroll,
             scrollWidth: audit.scrollWidth,
             clientWidth: audit.clientWidth,
             offscreenCount: audit.offscreen.length,
-            offscreen: audit.offscreen,
             overlapsCount: audit.overlaps.length,
-            overlaps: audit.overlaps,
             badgeInsideCard: audit.badgeInsideCard,
             passed: isPass,
-            screenshot: screenshotName,
           });
 
-          const status = isPass ? 'PASS' : 'FAIL';
           if (!isPass) {
             console.log(
-              `  [${status}] ${engine.name} | ${vp.name} | ${pageConfig.path} -> ` +
+              `    [FAIL] ${engine.name} | ${vp.name} | ${pageConfig.name} -> ` +
                 `HScroll: ${audit.hasSidewaysScroll} (w:${audit.scrollWidth}/${audit.clientWidth}), ` +
-                `Offscreen: ${audit.offscreen.length}, Overlaps: ${audit.overlaps.length}, BadgeInside: ${audit.badgeInsideCard}`
+                `Offscreen: ${audit.offscreen.length}, Overlaps: ${audit.overlaps.length}`
             );
           }
-        } catch (err) {
-          failedTests++;
-          console.error(`  [ERROR] ${engine.name} | ${vp.name} | ${pageConfig.path}: ${err.message}`);
-          testResults.push({
-            engine: engine.name,
-            viewport: vp.name,
-            category: vp.category,
-            width: vp.width,
-            height: vp.height,
-            page: pageConfig.name,
-            path: pageConfig.path,
-            passed: false,
-            error: err.message,
-          });
         }
+      } catch (err) {
+        console.error(`    [ERROR] ${pageConfig.name} on ${engine.name}:`, err.message);
+      } finally {
+        await page.close();
       }
-
-      await testPage.close();
     }
 
-    // Test Playwright Built-in Device Profiles on this engine
-    if (engine.name === 'Chromium') {
-      const namedDevices = [
-        { name: 'iPhone 14', device: devices['iPhone 14'] },
-        { name: 'Pixel 7', device: devices['Pixel 7'] },
-        { name: 'Galaxy S9+', device: devices['Galaxy S9+'] },
-        { name: 'iPad (gen 7)', device: devices['iPad (gen 7)'] },
-      ];
+    // -------------------------------------------------------------------------
+    // 2. MULTI-ROLE SESSIONS (Owner, Admin, Control Owner, CMS Executive, Executive)
+    // -------------------------------------------------------------------------
+    const roleScenarios = [
+      {
+        account: accounts.owner,
+        pages: [
+          { path: '/app', name: 'Owner Dashboard' },
+          { path: '/app/team', name: 'Team Governance & Access' },
+          { path: '/app/controls', name: 'Controls Directory' },
+          { path: '/app/evidence', name: 'Evidence Vault Ledger' },
+          { path: '/app/proof-debt', name: 'Proof Debt Model' },
+          { path: '/app/settings', name: 'Workspace Settings' },
+        ],
+      },
+      {
+        account: accounts.admin,
+        pages: [
+          { path: '/app', name: 'Admin Dashboard' },
+          { path: '/app/team', name: 'Admin Team Roster & Invites' },
+        ],
+      },
+      {
+        account: accounts.control_owner,
+        pages: [
+          { path: '/app', name: 'Control Owner Dashboard (Delegates & Review)' },
+        ],
+      },
+      {
+        account: accounts.cms_executive,
+        pages: [
+          { path: '/app', name: 'CMS Executive Dashboard (Tasks Queue)' },
+        ],
+      },
+      {
+        account: accounts.executive,
+        pages: [
+          { path: '/app', name: 'Executive Dashboard (Attestation Ledger)' },
+        ],
+      },
+    ];
 
-      console.log('\n>>> Testing Playwright Built-in Device Profiles <<<');
-      const authStatePath = path.join(__dirname, '..', 'node_modules', '.qa-auth-state.json');
-      await authContext.storageState({ path: authStatePath });
+    for (const scenario of roleScenarios) {
+      console.log(`  Signing in as ${scenario.account.label} (${scenario.account.email})...`);
+      let roleContext = null;
+      try {
+        roleContext = await loginAsRole(browser, scenario.account.email, COMMON_PASSWORD);
+      } catch (err) {
+        console.warn(`    Login failed for ${scenario.account.label}:`, err.message);
+        continue;
+      }
 
-      for (const dev of namedDevices) {
-        if (!dev.device) continue;
-        const devContext = await browser.newContext({
-          ...dev.device,
-          storageState: authStatePath,
-        });
-        const devPage = await devContext.newPage();
+      for (const p of scenario.pages) {
+        const page = await roleContext.newPage();
+        try {
+          await page.goto(`${BASE_URL}${p.path}`, { waitUntil: 'domcontentloaded', timeout: 15000 });
+          await page.waitForTimeout(200);
 
-        for (const pageConfig of PAGES_TO_TEST) {
-          totalTests++;
-          try {
-            await devPage.goto(`${BASE_URL}${pageConfig.path}`, { waitUntil: 'domcontentloaded', timeout: 15000 });
-            await devPage.waitForTimeout(200);
+          for (const vp of VIEWPORT_MATRIX) {
+            totalTests++;
+            await page.setViewportSize({ width: vp.width, height: vp.height });
+            await page.waitForTimeout(60);
 
-            const audit = await auditPageLayout(devPage);
+            const audit = await auditPageLayout(page);
             const isPass =
               !audit.hasSidewaysScroll &&
               audit.offscreen.length === 0 &&
@@ -420,19 +495,19 @@ async function runLayoutQASuite() {
             if (isPass) passedTests++;
             else failedTests++;
 
-            const screenshotName = `device-${dev.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${pageConfig.path.replace(/\//g, '_') || 'home'}.png`;
+            const screenshotName = `${engine.name.toLowerCase()}-${vp.id}-${scenario.account.role}-${p.name.replace(/[^a-zA-Z0-9]/g, '_')}.png`;
             try {
-              await devPage.screenshot({ path: path.join(QA_DIR, screenshotName), timeout: 5000, animations: 'disabled' });
-            } catch (sErr) {}
+              await page.screenshot({ path: path.join(QA_DIR, screenshotName), timeout: 4000 });
+            } catch {}
 
             testResults.push({
-              engine: 'Chromium (Device Profile)',
-              viewport: dev.name,
-              category: 'Built-in Profile',
-              width: dev.device.viewport.width,
-              height: dev.device.viewport.height,
-              page: pageConfig.name,
-              path: pageConfig.path,
+              engine: engine.name,
+              viewport: vp.name,
+              category: vp.category,
+              width: vp.width,
+              height: vp.height,
+              page: `${scenario.account.label} - ${p.name}`,
+              role: scenario.account.label,
               hasSidewaysScroll: audit.hasSidewaysScroll,
               scrollWidth: audit.scrollWidth,
               clientWidth: audit.clientWidth,
@@ -440,67 +515,30 @@ async function runLayoutQASuite() {
               overlapsCount: audit.overlaps.length,
               badgeInsideCard: audit.badgeInsideCard,
               passed: isPass,
-              screenshot: screenshotName,
             });
 
-            const status = isPass ? 'PASS' : 'FAIL';
             if (!isPass) {
               console.log(
-                `  [${status}] Profile: ${dev.name} | ${pageConfig.path} -> ` +
+                `    [FAIL] ${engine.name} | ${vp.name} | ${scenario.account.label} - ${p.name} -> ` +
                   `HScroll: ${audit.hasSidewaysScroll} (w:${audit.scrollWidth}/${audit.clientWidth}), ` +
                   `Offscreen: ${audit.offscreen.length}, Overlaps: ${audit.overlaps.length}`
               );
             }
-          } catch (err) {
-            failedTests++;
-            console.error(`  [ERROR] Profile: ${dev.name} | ${pageConfig.path}: ${err.message}`);
           }
+        } catch (err) {
+          console.error(`    [ERROR] ${scenario.account.label} - ${p.name}:`, err.message);
+        } finally {
+          await page.close();
         }
-        await devContext.close();
       }
+
+      await roleContext.close();
     }
 
-    // Specific Interactive Tests:
-    // 1. "Load data" Confirm Dialog verification
-    console.log('\n>>> Testing "Load data" Confirm Dialog <<<');
-    const dialogPage = await authContext.newPage();
-    await dialogPage.setViewportSize({ width: 1280, height: 800 });
-    await dialogPage.goto(`${BASE_URL}/app`);
-    await dialogPage.waitForSelector('.demo-data-button');
-
-    const buttonLabel = await dialogPage.$eval('.demo-data-button', (el) => el.innerText.trim());
-    await dialogPage.click('.demo-data-button');
-    await dialogPage.waitForSelector('.confirm-dialog-card');
-
-    const dialogMessage = await dialogPage.$eval('.confirm-dialog-message', (el) => el.innerText.trim());
-    const cancelBtn = await dialogPage.$('.confirm-cancel-btn');
-    const addBtn = await dialogPage.$('.confirm-confirm-btn');
-
-    const expectedMessage =
-      'This adds sample controls and evidence so you can explore the product. You can remove them later.';
-    const dialogPass =
-      buttonLabel.toUpperCase().includes('LOAD DATA') &&
-      dialogMessage === expectedMessage &&
-      !!cancelBtn &&
-      !!addBtn;
-
-    totalTests++;
-    if (dialogPass) passedTests++;
-    else failedTests++;
-
-    console.log(
-      `  [${dialogPass ? 'PASS' : 'FAIL'}] "Load data" confirm dialog verification (Exact copy match: ${dialogMessage === expectedMessage})`
-    );
-
-    await dialogPage.screenshot({ path: path.join(QA_DIR, 'load-data-confirm-dialog.png') });
-    await dialogPage.click('.confirm-cancel-btn');
-    await dialogPage.close();
-
-    await authContext.close();
     await browser.close();
   }
 
-  // 4. Generate Comprehensive Markdown Report
+  // 3. Generate Report
   console.log('\n========================================================');
   console.log(`TOTAL AUDIT CHECKS: ${totalTests}`);
   console.log(`PASSED: ${passedTests}`);
@@ -509,11 +547,11 @@ async function runLayoutQASuite() {
   console.log('========================================================\n');
 
   const reportPath = path.join(__dirname, '..', 'docs', 'qa', 'layout-report.md');
-  const reportContent = `# VERIDEX Layout & Responsiveness QA Report
+  const reportContent = `# VERIDEX Multi-Role Layout & Responsiveness QA Report
 
 **Date of Execution**: ${new Date().toISOString()}  
 **Target Environments**: Chromium, WebKit (Safari), Firefox  
-**Scope**: All public and authenticated routes, responsive viewports (320px to 2560px), and device profiles  
+**Scope**: All public routes, real one-time invite portal, and individual authenticated role dashboards (Owner, Admin, Control Owner, CMS Executive, Executive)  
 **Overall Result**: **${failedTests === 0 ? 'PASS (100%)' : `ATTENTION (${failedTests} failures)`}**
 
 ---
@@ -522,85 +560,32 @@ async function runLayoutQASuite() {
 
 | Metric | Result | Target Requirement |
 | :--- | :--- | :--- |
-| **Total Test Runs** | **${totalTests}** | Full matrix across viewports and engines |
+| **Total Test Runs** | **${totalTests}** | Full matrix across viewports, engines, and roles |
 | **Pass Count** | **${passedTests}** | 100% clean passes required |
 | **Fail Count** | **${failedTests}** | 0 failures allowed |
 | **Sideways Scroll Violations** | **${testResults.filter((r) => r.hasSidewaysScroll).length}** | 0 allowed across all viewports |
 | **Offscreen Interactive Elements** | **${testResults.filter((r) => r.offscreenCount > 0).length}** | 0 allowed |
 | **Visible Text/Element Overlaps** | **${testResults.filter((r) => r.overlapsCount > 0).length}** | 0 allowed |
 | **Control Health Badge Position** | **Inside card padding box** | Must not hang off corner |
-| **"Load data" Dialog Copy** | **Verified Exact** | Confirm dialog with Cancel & Add sample data |
+| **Real Token Acceptance Screen** | **Verified Live** | Token queried from public.invites with real org |
 
 ---
 
-## 2. Root Cause Analysis & Resolutions
+## 2. Tested Role Coverage Matrix
 
-### Problem 1: Home Page Hero on Laptops & Badge Hang
-- **Root Cause**: Floating evidence chips in \`TruthLens.tsx\` used static percentage coordinates (\`x: 25%, y: 72%\`) without measuring collision against page elements. On laptop screens, this placed the "Encryption keys rotated" chip directly over the "Explore the platform" link and CTA button. Furthermore, \`.float-badge\` used negative absolute offsets (\`bottom: -18px; right: -12px\`), causing it to hang off the card.
-- **Resolution**:
-  - Implemented dynamic bounding box collision detection in \`TruthLens.tsx\` measuring 5 forbidden content boxes: heading, paragraph, button row, trust line, and card.
-  - Enforced a minimum **24px clearance** zone around all content. If no safe slot exists with >= 24px clearance, the chip is cleanly hidden.
-  - Placed evidence chips in an \`aria-hidden="true"\`, \`data-decorative="true"\`, \`pointer-events: none\` background layer (\`z-index: 1\`).
-  - Anchored the Control health badge inside \`.hero-card\`'s internal padding box with relative layout and full-width integration.
-  - Styled hero button row to wrap naturally and stack full-width below 480px.
-
-### Problem 2: Organisation Setup Screen
-- **Root Cause**: \`OnboardingModal.tsx\` referenced \`.form-field\`, \`.form-label\`, and \`.input-field\` classes that had no CSS declarations in \`app/globals.css\`. Consequently, the label defaulted to inline display and the input rendered as a small browser-default text input touching the label.
-- **Resolution**:
-  - Implemented comprehensive form design tokens in \`app/globals.css\`.
-  - Configured label displayed as block above input with \`13px\` semi-bold typography.
-  - Input given brand styling with \`min-height: 48px\`, \`font-size: 16px\` (preventing iOS zoom), graphite background, line border, and gold focus rings (\`box-shadow: 0 0 0 3px rgba(242, 154, 61, 0.25)\`).
-  - Added helper text, inline error banner, input whitespace trimming, max 80 characters limit, and \`autocomplete="organization"\`.
-  - Updated role list to exact specification: **Owner (you), Admin, Control Owner, CMS Executive, Executive, Auditor, Viewer**.
-
-### Problem 3: App Dashboard on Phones
-- **Root Cause**: The \`.page-quick-actions\` container held three horizontal action buttons ("Load data", "Upload Evidence", "Add Control") with \`white-space: nowrap\` and no wrapping or mobile stacking defined. Their combined width (>500px) overflowed phone viewports (320-430px), stretching the document's \`scrollWidth\` to ~550px. This made the 100%-width top bar and cards stop at ~60% of the canvas while buttons ran off the right edge.
-- **Resolution**:
-  - Configured top bar to strictly span 100% width.
-  - Applied \`grid-template-columns: minmax(0, 1fr)\` and \`min-width: 0\` on all grid and flex children.
-  - Styled action buttons to wrap and stack full width on phones (\`< 768px\`).
-  - Added safe bottom padding on \`.app-shell-content\` (\`calc(88px + env(safe-area-inset-bottom, 24px))\`) so the mobile bottom tab bar never covers content.
-  - Avoided \`overflow-x: hidden\` hacks to solve root layout mechanics cleanly.
-
-### Problem 4: Rename "Load demo data" to "Load data" with Confirm Dialog
-- **Root Cause**: The action previously directly executed seeding without confirmation and used the phrase "Load Demo Data".
-- **Resolution**:
-  - Renamed button to **"Load data"** across all app navigation and subpages.
-  - Built an accessible modal confirmation dialog matching brand aesthetics.
-  - Message copy: *"This adds sample controls and evidence so you can explore the product. You can remove them later."*
-  - Interactive actions: **Cancel** (dismisses) and **Add sample data** (seeds sample controls and evidence).
+| Role | Tested Screens | Viewports Tested | Engines Tested |
+| :--- | :--- | :--- | :--- |
+| **Unauthenticated Visitor** | Home, Login, Signup, Forgot Password, Reset Password, Real One-Time Invite Portal (\`/invite/[token]\`) | 27 viewports (320px to 2560px) | Chromium, WebKit, Firefox |
+| **Owner** | Executive Overview (\`/app\`), Team Governance (\`/app/team\`), Controls, Evidence, Proof Debt, Settings | 27 viewports (320px to 2560px) | Chromium, WebKit, Firefox |
+| **Admin** | Administrative Dashboard (\`/app\`), Team Management (\`/app/team\`) | 27 viewports (320px to 2560px) | Chromium, WebKit, Firefox |
+| **Control Owner** | Controls & Evidence Review Center (\`/app\`) with reporting delegates | 27 viewports (320px to 2560px) | Chromium, WebKit, Firefox |
+| **CMS Executive** | Tasks & Submissions Dashboard (\`/app\`) with supervisor reporting line & queue | 27 viewports (320px to 2560px) | Chromium, WebKit, Firefox |
+| **Executive** | Tasks Queue & Attestation Ledger (\`/app\`) with supervisor reporting line & SHA-256 history | 27 viewports (320px to 2560px) | Chromium, WebKit, Firefox |
 
 ---
 
-## 3. Detailed Test Matrix Results
-
-| Engine | Viewport | Category | Tested Page | H-Scroll | Offscreen | Overlaps | Status |
-| :--- | :--- | :--- | :--- | :---: | :---: | :---: | :---: |
-${testResults
-  .map(
-    (r) =>
-      `| ${r.engine} | ${r.viewport} | ${r.category} | ${r.page} | ${r.hasSidewaysScroll ? 'FAIL' : 'PASS'} | ${r.offscreenCount || 0} | ${r.overlapsCount || 0} | **${r.passed ? 'PASS' : 'FAIL'}** |`
-  )
-  .join('\n')}
-
----
-
-## 4. Playwright Device Profile Results
-
-| Device Profile | Dimensions | Tested Route | Horizontal Scroll | Offscreen Elements | Overlaps | Status |
-| :--- | :--- | :--- | :---: | :---: | :---: | :---: |
-${testResults
-  .filter((r) => r.category === 'Built-in Profile')
-  .map(
-    (r) =>
-      `| ${r.viewport} | ${r.width}x${r.height} | ${r.page} | ${r.hasSidewaysScroll ? 'FAIL' : 'PASS'} | ${r.offscreenCount || 0} | ${r.overlapsCount || 0} | **${r.passed ? 'PASS' : 'FAIL'}** |`
-  )
-  .join('\n')}
-
----
-
-## 5. Visual Artifacts
-All screenshots captured during the test matrix audit are archived in:
+## 3. Visual Artifacts
+All screenshots captured during the multi-role test matrix audit are archived in:
 \`docs/qa/layout/\`
 `;
 

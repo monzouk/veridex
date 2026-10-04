@@ -8,22 +8,31 @@ interface EvidenceUploadModalProps {
   organisationId: string;
   onSuccess?: () => void;
   controlsList?: Array<{ id: string; code: string; title: string }>;
+  tasksList?: Array<{ id: string; title: string }>;
+  defaultTaskId?: string;
+  userRole?: string;
   supersedingEvidenceId?: string;
   currentVersion?: number;
+  triggerButtonText?: string;
 }
 
 export default function EvidenceUploadModal({
   organisationId,
   onSuccess,
   controlsList = [],
+  tasksList = [],
+  defaultTaskId,
+  userRole,
   supersedingEvidenceId,
   currentVersion = 1,
+  triggerButtonText,
 }: EvidenceUploadModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [selectedControlId, setSelectedControlId] = useState('');
+  const [selectedTaskId, setSelectedTaskId] = useState(defaultTaskId || '');
   const [computedHash, setComputedHash] = useState<string | null>(null);
   const [isHashing, setIsHashing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -98,6 +107,9 @@ export default function EvidenceUploadModal({
         throw new Error(`Storage upload failed: ${storageError.message}`);
       }
 
+      const isExecutiveRole = userRole === 'cms_executive' || userRole === 'executive';
+      const activeTaskId = selectedTaskId || defaultTaskId || null;
+
       // 2. Insert into 'evidence' table with SHA-256 and append-only version link
       const versionNumber = supersedingEvidenceId ? currentVersion + 1 : 1;
 
@@ -115,6 +127,7 @@ export default function EvidenceUploadModal({
           version: versionNumber,
           source: 'manual_upload',
           created_by: user.id,
+          task_id: activeTaskId,
         })
         .select('id')
         .single();
@@ -123,14 +136,22 @@ export default function EvidenceUploadModal({
         throw new Error(`Evidence ledger record failed: ${evidenceError.message}`);
       }
 
-      // 3. Link to control if selected
-      if (selectedControlId) {
+      // 3. Link to control if selected (Only allowed for Owner, Admin, Control Owner)
+      if (!isExecutiveRole && selectedControlId) {
         await supabase.from('control_evidence').insert({
           organisation_id: organisationId,
           control_id: selectedControlId,
           evidence_id: evidenceData.id,
           linked_by: user.id,
         });
+      }
+
+      // 4. Update task if attached
+      if (activeTaskId) {
+        await supabase
+          .from('tasks')
+          .update({ status: 'review', evidence_id: evidenceData.id })
+          .eq('id', activeTaskId);
       }
 
       setStatusMessage(`Evidence stored with SHA-256 digest and version v${versionNumber}.`);
@@ -162,7 +183,7 @@ export default function EvidenceUploadModal({
         onClick={() => setIsOpen(true)}
       >
         <UploadCloud size={16} aria-hidden="true" />
-        <span>{supersedingEvidenceId ? 'Upload New Version' : 'Upload Evidence'}</span>
+        <span>{triggerButtonText || (supersedingEvidenceId ? 'Upload New Version' : 'Upload Evidence')}</span>
       </button>
 
       {isOpen && (
@@ -264,8 +285,43 @@ export default function EvidenceUploadModal({
                 />
               </div>
 
-              {/* Link to Control */}
-              {controlsList.length > 0 && (
+              {/* Associated Task (Mandatory for Executive & CMS Executive) */}
+              {(tasksList.length > 0 || userRole === 'cms_executive' || userRole === 'executive') && (
+                <div className="form-field">
+                  <label htmlFor="evidence-task-select" className="form-label">
+                    Associated Task {(userRole === 'cms_executive' || userRole === 'executive') && <span className="text-amber">*</span>}
+                  </label>
+                  <select
+                    id="evidence-task-select"
+                    className="select-field"
+                    value={selectedTaskId}
+                    onChange={(e) => setSelectedTaskId(e.target.value)}
+                    disabled={isUploading || !!defaultTaskId}
+                    required={userRole === 'cms_executive' || userRole === 'executive'}
+                  >
+                    {tasksList.length === 0 ? (
+                      <option value="">No assigned tasks available</option>
+                    ) : (
+                      <>
+                        <option value="">Select an assigned compliance task...</option>
+                        {tasksList.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.title}
+                          </option>
+                        ))}
+                      </>
+                    )}
+                  </select>
+                  {(userRole === 'cms_executive' || userRole === 'executive') && (
+                    <p className="form-help-text">
+                      Evidence uploaded by Executives must be cryptographically attached to an active assigned task.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Link to Control (For Owner, Admin, Control Owner) */}
+              {userRole !== 'cms_executive' && userRole !== 'executive' && controlsList.length > 0 && (
                 <div className="form-field">
                   <label htmlFor="control-link-select" className="form-label">
                     Bind to Control (Optional)

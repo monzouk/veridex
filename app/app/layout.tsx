@@ -4,7 +4,8 @@ import AppSidebar from '@/components/AppSidebar';
 import AppTopBar from '@/components/AppTopBar';
 import AppBottomNav from '@/components/AppBottomNav';
 import OnboardingModal from '@/components/OnboardingModal';
-import { getUserOrganisation } from '@/app/actions/organisation';
+import DeactivatedAccessScreen from '@/components/DeactivatedAccessScreen';
+import { getUserOrganisation, getDeactivatedOrgStatus } from '@/app/actions/organisation';
 
 export const metadata = {
   title: 'Workspace | VERIDEX',
@@ -27,13 +28,29 @@ export default async function AppLayout({
 
   // Fetch active organisation from database
   const org = await getUserOrganisation();
+
+  // If user has no active organisation, check if they are deactivated
+  if (!org) {
+    const deactivatedOrgName = await getDeactivatedOrgStatus();
+    if (deactivatedOrgName) {
+      return (
+        <div className="app-shell-root">
+          <DeactivatedAccessScreen
+            orgName={deactivatedOrgName}
+            userEmail={user.email}
+          />
+        </div>
+      );
+    }
+  }
+
   const orgName = org?.name || 'Veridex Workspace';
   const userRole = org?.role || 'Owner';
   const needsOnboarding = !org;
 
   return (
     <div className="app-shell-root">
-      <AppSidebar orgName={orgName} userEmail={user.email} />
+      <AppSidebar orgName={orgName} userEmail={user.email} userRole={userRole} />
 
       <div className="app-shell-main-wrapper">
         <AppTopBar
