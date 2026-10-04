@@ -9,12 +9,14 @@ import {
   Scale,
   Settings,
   ShieldCheck,
+  Users,
 } from 'lucide-react';
 import AnimatedLogo from './AnimatedLogo';
 
 interface AppSidebarProps {
   orgName?: string;
   userEmail?: string;
+  userRole?: string;
 }
 
 const NAV_ITEMS = [
@@ -39,13 +41,18 @@ const NAV_ITEMS = [
     icon: Scale,
   },
   {
+    name: 'Team',
+    href: '/app/team',
+    icon: Users,
+  },
+  {
     name: 'Settings',
     href: '/app/settings',
     icon: Settings,
   },
 ];
 
-export default function AppSidebar({ orgName = 'Default Organisation' }: AppSidebarProps) {
+export default function AppSidebar({ orgName = 'Default Organisation', userRole }: AppSidebarProps) {
   const pathname = usePathname();
 
   return (

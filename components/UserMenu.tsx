@@ -77,6 +77,16 @@ export default function UserMenu({
           <div className="dropdown-divider" role="separator" />
 
           <Link
+            href="/app/team"
+            className="dropdown-item"
+            role="menuitem"
+            onClick={() => setIsOpen(false)}
+          >
+            <User size={15} aria-hidden="true" />
+            <span>Team & Roles</span>
+          </Link>
+
+          <Link
             href="/app/settings"
             className="dropdown-item"
             role="menuitem"

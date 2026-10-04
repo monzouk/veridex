@@ -192,3 +192,52 @@ export async function loadDemoDataAction(): Promise<DemoDataResult> {
     },
   };
 }
+
+/**
+ * Purges sample/demo data using public.remove_sample_data(p_organisation_id).
+ * Strictly restricted to organisation Owners.
+ */
+export async function removeSampleDataAction(): Promise<DemoDataResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, error: 'Authentication required.' };
+  }
+
+  const { data: membership, error: memError } = await supabase
+    .from('memberships')
+    .select('organisation_id, role, is_active')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .limit(1)
+    .single();
+
+  if (memError || !membership) {
+    return { success: false, error: 'Active membership not found.' };
+  }
+
+  if (membership.role !== 'owner') {
+    return { success: false, error: 'Permission denied: Only Owners can remove sample data.' };
+  }
+
+  const { data, error } = await supabase.rpc('remove_sample_data', {
+    p_organisation_id: membership.organisation_id,
+  });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/app');
+  revalidatePath('/app/controls');
+  revalidatePath('/app/evidence');
+  revalidatePath('/app/proof-debt');
+
+  return {
+    success: true,
+    message: data?.message || 'Sample data removed cleanly.',
+  };
+}

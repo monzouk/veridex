@@ -35,6 +35,7 @@ export async function getUserOrganisation() {
         )
       `)
       .eq('user_id', user.id)
+      .eq('is_active', true)
       .limit(1)
       .maybeSingle();
 
@@ -54,6 +55,23 @@ export async function getUserOrganisation() {
       slug: org.slug,
       role: membership.role,
     };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Checks if the current user has only deactivated memberships.
+ * Returns the name of the deactivated organisation, or null if active or never joined.
+ */
+export async function getDeactivatedOrgStatus(): Promise<string | null> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc('get_deactivated_org_name');
+    if (error || !data) {
+      return null;
+    }
+    return data as string;
   } catch {
     return null;
   }

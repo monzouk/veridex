@@ -8,6 +8,7 @@ import {
   FileCheck2,
   Scale,
   Settings,
+  Users,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -25,6 +26,11 @@ const NAV_ITEMS = [
     name: 'Evidence',
     href: '/app/evidence',
     icon: FileCheck2,
+  },
+  {
+    name: 'Team',
+    href: '/app/team',
+    icon: Users,
   },
   {
     name: 'Proof Debt',
